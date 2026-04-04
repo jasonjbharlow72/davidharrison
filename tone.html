@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pure Tone Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: 50px auto;
+      padding: 20px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+    }
+
+    input[type="number"] {
+      font-size: 1.1rem;
+      padding: 8px;
+      width: 180px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    button {
+      font-size: 1rem;
+      padding: 10px 20px;
+      margin: 0 8px;
+      cursor: pointer;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pure Tone Generator</h1>
+
+  <label for="freq">Enter frequency (25 to 20000 Hz):</label>
+  <input
+    type="number"
+    id="freq"
+    min="25"
+    max="20000"
+    step="1"
+    value="440"
+  />
+
+  <div>
+    <button id="playBtn">Play</button>
+    <button id="stopBtn">Stop</button>
+  </div>
+
+  <div id="status">Stopped</div>
+
+  <script>
+    let audioContext = null;
+    let oscillator = null;
+    let gainNode = null;
+
+    const freqInput = document.getElementById("freq");
+    const playBtn = document.getElementById("playBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const statusText = document.getElementById("status");
+
+    function getFrequency() {
+      const value = Number(freqInput.value);
+
+      if (isNaN(value) || value < 25 || value > 20000) {
+        alert("Please enter a frequency between 25 and 20000 Hz.");
+        return null;
+      }
+
+      return value;
+    }
+
+    async function playTone() {
+      const frequency = getFrequency();
+      if (frequency === null) return;
+
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      stopTone();
+
+      oscillator = audioContext.createOscillator();
+      gainNode = audioContext.createGain();
+
+      oscillator.type = "sine";   // pure tone
+      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+
+      gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.start();
+
+      statusText.textContent = `Playing ${frequency} Hz`;
+    }
+
+    function stopTone() {
+      if (oscillator) {
+        oscillator.stop();
+        oscillator.disconnect();
+        oscillator = null;
+      }
+
+      if (gainNode) {
+        gainNode.disconnect();
+        gainNode = null;
+      }
+
+      statusText.textContent = "Stopped";
+    }
+
+    playBtn.addEventListener("click", playTone);
+    stopBtn.addEventListener("click", stopTone);
+
+    freqInput.addEventListener("change", () => {
+      if (oscillator && audioContext) {
+        const frequency = getFrequency();
+        if (frequency !== null) {
+          oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+          statusText.textContent = `Playing ${frequency} Hz`;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
