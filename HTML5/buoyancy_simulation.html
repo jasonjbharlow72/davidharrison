@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Buoyancy Lab — PHY180</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#142437;background:#f3f7fb}*{box-sizing:border-box}body{margin:0;padding:22px}main{max-width:1100px;margin:auto}h1{margin:0 0 5px;font-size:1.8rem}p{line-height:1.5}.sub{margin:0 0 18px;color:#52677b}.layout{display:grid;grid-template-columns:minmax(340px,1.4fr) minmax(280px,1fr);gap:18px}.panel{background:white;border:1px solid #dbe5ef;border-radius:14px;padding:18px;box-shadow:0 4px 20px #122a4410}.canvaswrap{position:relative}canvas{display:block;width:100%;height:auto;border-radius:10px;background:#f7fbff;touch-action:none;cursor:grab}canvas:active{cursor:grabbing}.note{font-size:.9rem;color:#52677b}.control{margin:15px 0}.control label{display:flex;justify-content:space-between;gap:12px;font-weight:650;font-size:.95rem}.control output{font-variant-numeric:tabular-nums;color:#086e9b}.control input{width:100%;accent-color:#0879ad;margin-top:10px}button{border:1px solid #bed0df;border-radius:8px;padding:10px 13px;background:#e9f5fc;color:#12334a;font-weight:650;cursor:pointer}button:hover{background:#d6eaf6}.buttons{display:flex;gap:8px;flex-wrap:wrap}.stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}.stat{background:#f2f7fb;border-radius:9px;padding:10px}.stat small{display:block;color:#587084}.stat strong{display:block;font-size:1.12rem;font-variant-numeric:tabular-nums;margin-top:3px}.status{font-weight:750;color:#086e9b}.eq{font-size:.95rem;background:#f6f9fc;border-left:4px solid #1888b5;padding:10px 12px;border-radius:4px}.check{display:flex;gap:8px;align-items:center;margin:12px 0}.check input{accent-color:#0879ad}footer{margin:18px 0;color:#52677b;font-size:.87rem}@media(max-width:760px){body{padding:10px}.layout{grid-template-columns:1fr}.panel{padding:12px}}
+</style>
+</head>
+<body><main>
+<h1>Buoyancy Lab</h1><p class="sub">Explore Archimedes’ principle · PHY180 · University Physics</p>
+<div class="layout">
+<section class="panel"><div class="canvaswrap"><canvas id="scene" width="650" height="530" aria-label="Interactive water tank with draggable block, water surface, and force arrows"></canvas></div>
+<p class="note">Drag the block up or down to submerge it, then release it. Blue arrow = buoyant force; orange arrow = weight. Force arrows use a common visual scale, capped to fit.</p>
+<div class="buttons"><button id="reset">Reset block</button><button id="pause">Pause motion</button><button id="center">Place fully underwater</button></div>
+<label class="check"><input type="checkbox" id="forces" checked> Show force arrows</label>
+<label class="check"><input type="checkbox" id="equilibrium" checked> Show equilibrium depth marker</label>
+</section>
+<section class="panel">
+<div class="control"><label for="rhoObj">Object density <output id="rhoObjOut"></output></label><input id="rhoObj" type="range" min="100" max="2000" step="25" value="600"></div>
+<div class="control"><label for="rhoFluid">Fluid density <output id="rhoFluidOut"></output></label><input id="rhoFluid" type="range" min="500" max="1500" step="25" value="1000"></div>
+<div class="control"><label for="volume">Object volume <output id="volumeOut"></output></label><input id="volume" type="range" min="0.5" max="8" step="0.5" value="2"></div>
+<div class="stats"><div class="stat"><small>Object mass</small><strong id="mass"></strong></div><div class="stat"><small>Submerged fraction</small><strong id="fraction"></strong></div><div class="stat"><small>Weight (down)</small><strong id="weight"></strong></div><div class="stat"><small>Buoyant force (up)</small><strong id="buoyancy"></strong></div><div class="stat"><small>Net vertical force</small><strong id="net"></strong></div><div class="stat"><small>State</small><strong class="status" id="state"></strong></div></div>
+<p class="eq"><b>Archimedes’ principle</b><br>F<sub>B</sub> = ρ<sub>fluid</sub> g V<sub>submerged</sub><br>W = ρ<sub>object</sub> g V<sub>object</sub></p>
+<p class="note">The object is a cube. Volume is in litres (1 L = 0.001 m³). The model uses a uniform-density, incompressible fluid, ignores surface tension and fluid drag details, and includes simple damping for a readable animation.</p>
+</section></div>
+<footer>Self-contained HTML/JavaScript teaching simulation. Works offline and on GitHub Pages. No dependencies.</footer>
+</main>
+<script>
+(()=>{'use strict';
+const canvas=document.getElementById('scene'),ctx=canvas.getContext('2d');
+const el=id=>document.getElementById(id);
+const rhoObj=el('rhoObj'),rhoFluid=el('rhoFluid'),volume=el('volume');
+const surface=180,bottom=476,centerX=325,pxPerM=220,g=9.81;
+let y=180,vy=0,dragging=false,dragOffset=0,paused=false,last=0;
+const get=()=>({ro:+rhoObj.value,rf:+rhoFluid.value,V:+volume.value/1000});
+function side(V){return Math.cbrt(V)*pxPerM}
+function submerged(y,s){return Math.max(0,Math.min(s,y+s/2-surface))/s}
+function fmt(n,d=2){return n.toFixed(d)}
+function update(){const {ro,rf,V}=get(),s=side(V),f=submerged(y,s),m=ro*V,W=m*g,B=rf*g*V*f,N=B-W;
+ el('rhoObjOut').textContent=ro+' kg/m³';el('rhoFluidOut').textContent=rf+' kg/m³';el('volumeOut').textContent=fmt(V*1000,1)+' L';
+ el('mass').textContent=fmt(m)+' kg';el('fraction').textContent=fmt(f*100,1)+'%';el('weight').textContent=fmt(W)+' N';el('buoyancy').textContent=fmt(B)+' N';el('net').textContent=(N>=0?'+':'')+fmt(N)+' N';
+ const onFloor=y+s/2>=bottom-0.5;
+ el('state').textContent=dragging?'Held by hand':onFloor?'On bottom':Math.abs(N)<0.08?'Balanced':N>0?'Rising tendency':'Sinking tendency';return {ro,rf,V,s,f,m,W,B,N,onFloor};}
+function arrow(x,y0,dy,color,label){if(Math.abs(dy)<1)return;ctx.save();ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,y0);ctx.lineTo(x,y0+dy);ctx.stroke();const sign=Math.sign(dy),tip=y0+dy;ctx.beginPath();ctx.moveTo(x,tip);ctx.lineTo(x-9,tip-14*sign);ctx.lineTo(x+9,tip-14*sign);ctx.closePath();ctx.fill();ctx.font='bold 17px system-ui';ctx.fillText(label,x+15,tip-9*sign);ctx.restore()}
+function draw(){const a=update(),{s,f,ro,rf,W,B}=a;ctx.clearRect(0,0,650,530);
+ ctx.fillStyle='#e8f2fa';ctx.fillRect(50,70,550,410);
+ ctx.fillStyle='#b4e6fa';ctx.fillRect(68,surface,514,bottom-surface);
+ ctx.strokeStyle='#4d9fc3';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(68,surface);ctx.lineTo(582,surface);ctx.stroke();
+ ctx.strokeStyle='#738fa5';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(68,88);ctx.lineTo(68,bottom);ctx.lineTo(582,bottom);ctx.lineTo(582,88);ctx.stroke();
+ ctx.fillStyle='#355b72';ctx.font='16px system-ui';ctx.fillText('AIR',86,110);ctx.fillText('FLUID',86,211);ctx.fillText('surface',480,167);
+ ctx.fillStyle='#7b92a4';ctx.font='13px system-ui';ctx.fillText('Not to scale',470,510);
+ if(el('equilibrium').checked&&ro<rf){const target=surface+s*(ro/rf-0.5);ctx.save();ctx.strokeStyle='#7b51a8';ctx.setLineDash([6,6]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(83,target);ctx.lineTo(572,target);ctx.stroke();ctx.fillStyle='#684192';ctx.font='13px system-ui';ctx.fillText('equilibrium centre',88,Math.max(90,target-9));ctx.restore()}
+ const x=centerX-s/2,top=y-s/2;ctx.fillStyle='#f4a43a';ctx.fillRect(x,top,s,s);ctx.fillStyle='#e27c24';ctx.fillRect(x,Math.max(top,surface),s,Math.max(0,Math.min(top+s,bottom)-Math.max(top,surface)));ctx.strokeStyle='#92531d';ctx.lineWidth=3;ctx.strokeRect(x,top,s,s);
+ ctx.fillStyle='#543915';ctx.font='bold 14px system-ui';ctx.textAlign='center';ctx.fillText('OBJECT',centerX,y+5);ctx.textAlign='left';
+ if(el('forces').checked){const scale=2.3,max=125;arrow(centerX-42,y,-Math.min(max,B*scale),'#087fb5','Fᵦ');arrow(centerX+42,y,Math.min(max,W*scale),'#c65b21','W')}
+ ctx.fillStyle='#1e4b65';ctx.font='14px system-ui';ctx.fillText('ρ fluid = '+rf+' kg/m³',85,449);
+}
+function tick(ts){if(!last)last=ts;let dt=Math.min((ts-last)/1000,0.04);last=ts;
+ const {s,m,N}=update();if(!dragging&&!paused){const floorY=bottom-s/2,topY=82+s/2;const onFloor=y>=floorY-0.1;
+ let force=N;if(onFloor&&force<0)force=0;
+ const acc=Math.max(-18,Math.min(18,force/m));vy+=(acc*pxPerM-2.3*vy)*dt;y+=vy*dt;
+ if(y>floorY){y=floorY;vy=0}if(y<topY){y=topY;vy=0}
+ }draw();requestAnimationFrame(tick)}
+ function pointerPos(e){const rect=canvas.getBoundingClientRect();return {x:(e.clientX-rect.left)*canvas.width/rect.width,y:(e.clientY-rect.top)*canvas.height/rect.height}}
+ canvas.addEventListener('pointerdown',e=>{const p=pointerPos(e),s=side(get().V);if(Math.abs(p.x-centerX)<s/2+12&&Math.abs(p.y-y)<s/2+12){dragging=true;dragOffset=p.y-y;vy=0;canvas.setPointerCapture(e.pointerId)}});
+ canvas.addEventListener('pointermove',e=>{if(!dragging)return;const s=side(get().V),p=pointerPos(e);y=Math.max(82+s/2,Math.min(bottom-s/2,p.y-dragOffset));vy=0});
+ function release(){dragging=false}canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);
+ el('reset').onclick=()=>{const {ro,rf,V}=get(),s=side(V);y=ro<rf?surface+s*(ro/rf-0.5):surface-s/2;vy=0};
+ el('center').onclick=()=>{const s=side(get().V);y=Math.min(bottom-s/2,surface+s/2+35);vy=0};
+ el('pause').onclick=()=>{paused=!paused;el('pause').textContent=paused?'Resume motion':'Pause motion'};
+ [rhoObj,rhoFluid,volume].forEach(e=>e.addEventListener('input',()=>{vy=0;const s=side(get().V);y=Math.max(82+s/2,Math.min(bottom-s/2,y))}));
+ el('reset').click();requestAnimationFrame(tick);
+})();
+</script></body></html>
