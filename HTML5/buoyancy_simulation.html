@@ -25,7 +25,7 @@ body{font:16px system-ui,Arial,sans-serif;background:#f5f7fb;color:#172536;margi
   const fluid=document.getElementById('fluidDensity');
   const block=document.getElementById('block');
   function update(){
-    const rho=Number(obj.value), rf=Number(fluid.value), volume=0.001, g=9.81;
+    const rho=Number(obj.value), rf=Number(fluid.value), volume=0.001, g=9.8;
     document.getElementById('objectValue').textContent=rho+' kg/m³';
     document.getElementById('fluidValue').textContent=rf+' kg/m³';
     const fraction=Math.min(1,rho/rf);
